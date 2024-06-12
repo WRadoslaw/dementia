@@ -19,6 +19,7 @@ local function get_modified_buffers()
 				bufnr = bufnr,
 				filename = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":~:."),
 				saved = false, -- Add a saved field to track if the buffer is saved
+				discarded = false,
 			})
 		end
 	end
@@ -31,6 +32,8 @@ local function entry_maker(entry)
 		display = function(e)
 			if e.value.saved then
 				return string.format("%s %s", e.value.filename, "[saved]")
+			elseif e.value.discarded then
+				return string.format("%s %s", e.value.filename, "[discarded]")
 			else
 				return e.value.filename
 			end
@@ -90,8 +93,27 @@ M.show_modified_buffers = function()
 					)
 				end
 
+				local function discard_selected_buffer()
+					local selection = action_state.get_selected_entry()
+					vim.api.nvim_buf_call(selection.value.bufnr, function()
+						vim.cmd("edit!")
+					end)
+					selection.value.discarded = true
+					-- Refresh the picker
+					local current_picker = action_state.get_current_picker(prompt_bufnr)
+					current_picker:refresh(
+						finders.new_table({
+							results = buffers,
+							entry_maker = entry_maker,
+						}),
+						{ reset_prompt = false }
+					)
+				end
+
 				map("i", "<CR>", save_selected_buffer)
 				map("n", "<CR>", save_selected_buffer)
+				map("i", "<BS>", discard_selected_buffer)
+				map("n", "<BS>", discard_selected_buffer)
 
 				return true
 			end,
